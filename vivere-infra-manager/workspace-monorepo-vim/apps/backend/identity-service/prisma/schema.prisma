@@ -1,0 +1,127 @@
+// =====================================================
+// schema.prisma - Identity Service Database
+// Domínio: Organizações, pessoas, endereços e consentimentos
+// Versão: 1.0
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/@identity/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Organizações (empresas, governos, entidades jurídicas)
+model organizations {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legal_name String   // Razão social
+  trade_name String?  // Nome fantasia
+  tax_id     String   @unique // CNPJ (PII) – será transformado em índice parcial no script complementar
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid // Quem criou (ref. auth_db.users)
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String?  @db.Uuid
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relacionamentos
+  organization_persons organization_persons[]
+  addresses            addresses[]
+
+  @@map("organizations")
+  @@index([deleted_at])
+}
+
+// Pessoas físicas
+model persons {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name  String   // Nome completo
+  tax_id     String?  @unique // CPF (opcional, PII) – será transformado em índice parcial
+  birth_date DateTime? @db.Date
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String?  @db.Uuid
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relacionamentos
+  organization_persons organization_persons[]
+  addresses            addresses[]
+  consents             consents[]
+
+  @@map("persons")
+  @@index([deleted_at])
+}
+
+// Tabela de vínculos entre pessoas e organizações (muitos-para-muitos)
+model organization_persons {
+  organization   organizations @relation(fields: [organization_id], references: [id])
+  organization_id String        @db.Uuid
+  person         persons        @relation(fields: [person_id], references: [id])
+  person_id      String         @db.Uuid
+  role           String         // Ex.: 'FUNCIONARIO', 'REPRESENTANTE', 'CONTATO'
+  start_date     DateTime?      @db.Date
+  end_date       DateTime?      @db.Date
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid
+
+  @@id([organization_id, person_id, role])
+  @@map("organization_persons")
+}
+
+// Endereços (podem pertencer a organizações ou pessoas)
+model addresses {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization    organizations? @relation(fields: [organization_id], references: [id])
+  organization_id String?       @db.Uuid
+  person          persons?      @relation(fields: [person_id], references: [id])
+  person_id       String?       @db.Uuid
+  street          String
+  number          String?
+  complement      String?
+  neighborhood    String?
+  zip_code        String
+  city            String
+  state           String
+  country         String   @default("Brasil")
+  is_primary      Boolean  @default(false)
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String?  @db.Uuid
+  deleted_at DateTime? @db.Timestamptz
+
+  @@map("addresses")
+  // Índices simples (parciais serão criados via SQL)
+  @@index([organization_id])
+  @@index([person_id])
+  @@index([deleted_at])
+}
+
+// Consentimentos LGPD (para pessoas físicas)
+model consents {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  person      persons  @relation(fields: [person_id], references: [id])
+  person_id   String   @db.Uuid
+  purpose     String   // Ex.: 'MARKETING', 'EXECUCAO_CONTRATO'
+  is_granted  Boolean  @default(false)
+  ip_address  String?
+  user_agent  String?
+  valid_until DateTime? @db.Timestamptz
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid
+
+  @@map("consents")
+  @@index([person_id])
+}

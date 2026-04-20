@@ -1,0 +1,189 @@
+# ============================================================
+# VIVERE PLATFORM – PostgreSQL Multi-Database Infrastructure
+# Enterprise Production Edition – Revisão Platinum
+# ============================================================
+#
+# Uso:
+#   docker compose --profile <perfil> up -d
+#   Perfis: auth, identity, logistics, service-order, warehouse
+#
+# Notas:
+#   - A rede 'backend-network' é externa (deve ser criada antes)
+#   - Cada banco tem volume persistente separado por ambiente (SEED_ENV)
+#   - Scripts de seed são executados automaticamente na primeira inicialização
+#   - Healthchecks configurados para verificar prontidão
+#   - Parâmetros de performance são passados via command (valores do .env)
+#   - É necessário um arquivo .env neste diretório com as variáveis:
+#       POSTGRES_USER, POSTGRES_PASSWORD (opcional), SEED_ENV (development/staging/production)
+#
+# ============================================================
+
+networks:
+  backend-network:
+    external: true   # Criar antes: docker network create backend-network
+
+# ============================================================
+# SERVIÇOS
+# ============================================================
+
+services:
+
+  # ----------------- AUTH DATABASE -----------------
+  auth-db:
+    build:
+      context: ./auth
+      dockerfile: Dockerfile
+    container_name: auth-db
+    profiles: ["auth"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./auth/data/${SEED_ENV}:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}
+
+  # ----------------- IDENTITY DATABASE -----------------
+  identity-db:
+    build:
+      context: ./identity
+      dockerfile: Dockerfile
+    container_name: identity-db
+    profiles: ["identity"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: identity_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./identity/data/${SEED_ENV}:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d identity_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}
+
+  # ----------------- LOGISTICS DATABASE -----------------
+  logistics-db:
+    build:
+      context: ./logistics
+      dockerfile: Dockerfile
+    container_name: logistics-db
+    profiles: ["logistics"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: logistics_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./logistics/data/${SEED_ENV}:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d logistics_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}
+
+  # ----------------- SERVICE ORDER DATABASE -----------------
+  service-order-db:
+    build:
+      context: ./service-order
+      dockerfile: Dockerfile
+    container_name: service-order-db
+    profiles: ["service-order"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: service_order_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./service-order/data/${SEED_ENV}:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d service_order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}
+
+  # ----------------- WAREHOUSE DATABASE -----------------
+  warehouse-db:
+    build:
+      context: ./warehouse
+      dockerfile: Dockerfile
+    container_name: warehouse-db
+    profiles: ["warehouse"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: warehouse_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./warehouse/data/${SEED_ENV}:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d warehouse_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c wal_buffers=${POSTGRES_WAL_BUFFERS:-16MB}
