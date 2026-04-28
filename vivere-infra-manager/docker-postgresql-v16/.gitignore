@@ -1,6 +1,0 @@
-# PostgreSQL data
-docker-postgresql-v16/**/data/
-docker-postgresql-v16/**/pg_wal/
-docker-postgresql-v16/**/pg_control
-docker-postgresql-v16/**/postmaster.pid
-docker-postgresql-v16/**/postmaster.opts
