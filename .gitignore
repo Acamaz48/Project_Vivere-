@@ -1,0 +1,72 @@
+# ==============================================================================
+# ENV / SECRETS
+# ==============================================================================
+# Ignora arquivos .env em qualquer nível
+**/.env
+**/.env.local
+**/.env.*.local
+# Garante que os templates de env continuem versionados
+!**/.env.example
+
+# ==============================================================================
+# LOGS GLOBAIS
+# ==============================================================================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ==============================================================================
+# OS / AMBIENTE
+# ==============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ==============================================================================
+# DADOS DO BANCO DE DADOS (PostgreSQL)
+# Ignora o conteúdo das pastas de dados de todos os serviços (identity, auth, etc.)
+# mas mantém os arquivos .gitkeep para preservar a estrutura de pastas
+# ==============================================================================
+docker-postgresql-v16/*/data/development/*
+docker-postgresql-v16/*/data/production/*
+docker-postgresql-v16/*/data/staging/*
+
+!docker-postgresql-v16/*/data/development/.gitkeep
+!docker-postgresql-v16/*/data/production/.gitkeep
+!docker-postgresql-v16/*/data/staging/.gitkeep
+
+# ==============================================================================
+# MONOREPO VIM
+# ==============================================================================
+workspace-monorepo-vim/node_modules/
+workspace-monorepo-vim/dist/
+workspace-monorepo-vim/tmp/
+workspace-monorepo-vim/coverage/
+
+# Cache do Nx Workspace
+workspace-monorepo-vim/.nx/cache/
+workspace-monorepo-vim/.nx/workspace-data/
+
+# Prisma (Clientes Gerados)
+workspace-monorepo-vim/apps/backend/*/prisma/generated/
+*.db
+*.sqlite
+
+# ==============================================================================
+# IDEs e EDITORES
+# ==============================================================================
+**/.vscode/extensions.json
+**/.vscode/launch.json
+**/.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

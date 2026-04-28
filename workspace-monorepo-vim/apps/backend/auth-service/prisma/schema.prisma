@@ -1,0 +1,120 @@
+// =====================================================
+// schema.prisma - Auth Service Database
+// Domínio: Autenticação, usuários, perfis e sessões
+// Versão: 1.0
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/@auth/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enum para status de tentativa de login
+enum LoginStatus {
+  SUCCESS
+  FAILED
+  MFA_CHALLENGE
+}
+
+// Usuários do sistema (credenciais)
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  person_id     String    @db.Uuid // Referência lógica à pessoa no identity_db (sem FK)
+  email         String    @unique // Índice único será substituído por parcial no script complementar
+  password_hash String
+  is_active     Boolean   @default(true)
+  requires_mfa  Boolean   @default(false)
+  last_login_at DateTime? @db.Timestamptz
+
+  // Auditoria
+  created_at  DateTime @default(now()) @db.Timestamptz
+  created_by  String?  @db.Uuid // Quem criou (ref. auth_db.users ou outro)
+  updated_at  DateTime @updatedAt @db.Timestamptz
+  updated_by  String?  @db.Uuid
+  deleted_at  DateTime? @db.Timestamptz
+
+  // Relacionamentos
+  login_history  login_history[]
+  sessions       sessions[]
+  refresh_tokens refresh_token[]
+  user_roles     user_roles[]
+
+  @@map("users")
+  @@index([deleted_at])
+}
+
+// Histórico de tentativas de login (auditoria de segurança)
+model login_history {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user           User         @relation(fields: [user_id], references: [id]) // <-- MUDOU AQUI PARA "User" (maiúsculo)
+  user_id        String       @db.Uuid
+  login_at       DateTime     @default(now()) @db.Timestamptz
+  ip_address     String?
+  status         LoginStatus
+  failure_reason String?
+
+  @@map("login_history")
+  @@index([user_id])
+}
+
+
+model refresh_token {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id])
+  user_id    String   @db.Uuid
+  token      String   @unique
+  expired_at DateTime @db.Timestamptz
+  revoked_at DateTime? @db.Timestamptz
+
+  @@map("refresh_token")
+  @@index([user_id])
+}
+
+//Modelo de Sessão espelhado no Refresh Token 
+model sessions {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user            User      @relation(fields: [user_id], references: [id])
+  user_id         String    @db.Uuid
+  refresh_token   String
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  expired_at      DateTime  @db.Timestamptz
+  revoked_at      DateTime? @db.Timestamptz
+  ip_address      String?
+  user_agent      String?
+
+  @@map("sessions")
+  @@index([user_id])
+}
+
+
+// Perfis de acesso (roles)
+model roles {
+  code        String   @id
+  description String?
+  permissions Json     @default("[]") // JSONB no PostgreSQL
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+  updated_by  String?  @db.Uuid
+
+  // Relacionamentos
+  user_roles user_roles[]
+
+  @@map("roles")
+}
+
+// Associação usuário-perfil
+model user_roles {
+  user        User     @relation(fields: [user_id], references: [id])
+  user_id     String   @db.Uuid
+  role        roles    @relation(fields: [role_code], references: [code])
+  role_code   String
+  assigned_at DateTime @default(now()) @db.Timestamptz
+  assigned_by String?  @db.Uuid // Quem concedeu o papel (rastreabilidade)
+
+  @@id([user_id, role_code])
+  @@map("user_roles")
+}

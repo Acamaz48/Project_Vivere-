@@ -1,0 +1,159 @@
+// =====================================================
+// schema.prisma - Logistics Service Database
+// Domínio: Estoque, reservas, movimentações
+// Versão: 1.0
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/@logistics/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Tipos de localização
+enum LocationType {
+  WAREHOUSE
+  EVENT
+  VEHICLE
+}
+
+// Tipos de movimentação
+enum MovementType {
+  INBOUND
+  OUTBOUND
+  TRANSFER
+  ADJUSTMENT
+  LOSS
+  THIRD_PARTY_IN
+  THIRD_PARTY_OUT
+}
+
+// Endereços dos locais físicos
+model addresses {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  street      String
+  number      String?
+  complement  String?
+  neighborhood String?
+  zip_code    String
+  city        String
+  state       String
+  country     String   @default("Brasil")
+  latitude    Decimal? @db.Decimal(10,8)
+  longitude   Decimal? @db.Decimal(11,8)
+
+  // Auditoria
+  created_at  DateTime @default(now()) @db.Timestamptz
+  created_by  String?  @db.Uuid
+  updated_at  DateTime @updatedAt @db.Timestamptz
+  updated_by  String?  @db.Uuid
+  deleted_at  DateTime? @db.Timestamptz
+
+  // Relacionamentos
+  locations locations[]
+
+  @@map("addresses")
+  @@index([zip_code])
+  @@index([city, state])
+  @@index([deleted_at])
+}
+
+// Locais (armazém, evento, veículo)
+model locations {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  type       LocationType
+  address    addresses?   @relation(fields: [address_id], references: [id])
+  address_id String?      @db.Uuid
+  order_id   String?      @db.Uuid // Referência lógica à OS (service-order_db) quando for EVENT
+  is_active  Boolean      @default(true)
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String?  @db.Uuid
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String?  @db.Uuid
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relacionamentos
+  inventory   inventory[]
+  allocations allocations[]
+  movements_from movements[] @relation("from_location")
+  movements_to   movements[] @relation("to_location")
+
+  @@map("locations")
+  @@index([type])
+  // Índice simples (parcial será criado via SQL)
+  @@index([order_id])
+  @@index([deleted_at])
+}
+
+// Inventário (snapshot por local/item) – apenas itens próprios
+model inventory {
+  location   locations @relation(fields: [location_id], references: [id])
+  location_id String    @db.Uuid
+  item_id    String    @db.Uuid // Referência lógica ao warehouse_db
+  quantity   Decimal   @db.Decimal(18,6) @default(0)
+
+  last_count_at DateTime? @db.Timestamptz
+  updated_by    String?   @db.Uuid
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  @@id([location_id, item_id])
+  @@map("inventory")
+}
+
+// Alocações (reservas por período)
+model allocations {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id    String   @db.Uuid // Referência lógica ao warehouse_db
+  location   locations @relation(fields: [location_id], references: [id])
+  location_id String   @db.Uuid
+  quantity   Decimal  @db.Decimal(18,6)
+  status     String   @default("RESERVED")
+
+  // Para representar o intervalo, usaremos start e end separados
+  period_start DateTime @db.Timestamptz
+  period_end   DateTime @db.Timestamptz
+
+  // Auditoria
+  created_at DateTime @default(now()) @db.Timestamptz
+  created_by String  @db.Uuid
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String? @db.Uuid
+
+  @@map("allocations")
+  @@index([item_id, location_id, period_start, period_end])
+  @@index([period_start, period_end]) // Auxiliar para consultas
+}
+
+// Movimentações físicas
+model movements {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id         String       @db.Uuid // Referência lógica ao warehouse_db
+  from_location   locations?   @relation("from_location", fields: [from_location_id], references: [id])
+  from_location_id String?     @db.Uuid
+  to_location     locations?   @relation("to_location", fields: [to_location_id], references: [id])
+  to_location_id   String?     @db.Uuid
+  quantity        Decimal      @db.Decimal(18,6)
+  movement_type   MovementType
+  document_ref    String?
+  reason          String?
+  occurred_at     DateTime     @default(now()) @db.Timestamptz
+
+  // Auditoria
+  created_by String @db.Uuid
+
+  @@map("movements")
+  @@index([item_id])
+  @@index([document_ref])
+  @@index([occurred_at])
+  @@index([from_location_id])
+  @@index([to_location_id])
+}
